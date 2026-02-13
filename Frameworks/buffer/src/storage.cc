@@ -93,8 +93,9 @@ namespace ng
 
 		char storage_t::operator[] (size_t i) const
 		{
-			ASSERT_LE(i, size());
+			ASSERT_LT(i, size());
 			auto it = find_pos(i);
+			ASSERT_NE(it, _tree.end());
 			return it->value.bytes()[i - it->offset];
 		}
 

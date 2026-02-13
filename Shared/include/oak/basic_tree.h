@@ -13,8 +13,16 @@ namespace oak
 		basic_tree_t (basic_tree_t&& rhs)                 { _root = rhs._root; _size = rhs._size; rhs._root = node_t::null_ptr(); rhs._size = 0; }
 		basic_tree_t (basic_tree_t const& rhs)            { _root = clone_node(rhs._root); _size = rhs._size; }
 		~basic_tree_t ()                                  { clear(); }
-		basic_tree_t& operator= (basic_tree_t&& rhs)      { _root = rhs._root; _size = rhs._size; rhs._root = node_t::null_ptr(); rhs._size = 0; return *this; }
-		basic_tree_t& operator= (basic_tree_t const& rhs) { _root = clone_node(rhs._root); _size = rhs._size; return *this; }
+		basic_tree_t& operator= (basic_tree_t&& rhs)      { swap(rhs); return *this; }
+		basic_tree_t& operator= (basic_tree_t const& rhs)
+		{
+			if(this != &rhs)
+			{
+				basic_tree_t tmp(rhs);
+				swap(tmp);
+			}
+			return *this;
+		}
 
 		struct value_type
 		{
@@ -22,8 +30,11 @@ namespace oak
 
 			value_type& operator= (value_type const& rhs)
 			{
-				this->~value_type();
-				new(this) value_type(rhs);
+				if(this != &rhs)
+				{
+					this->~value_type();
+					new(this) value_type(rhs);
+				}
 				return *this;
 			}
 

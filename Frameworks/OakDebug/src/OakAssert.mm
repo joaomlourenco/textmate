@@ -11,41 +11,51 @@ std::string OakStackDump (int linesToSkip)
 	void* callstack[256];
 	int frames = backtrace(callstack, sizeofA(callstack));
 
-	int n = 0;
-	char trace[1024];
-	for(int i = 0; i < frames && n < sizeof(trace); ++i)
-		n += snprintf(trace + n, sizeof(trace) - n, "%p, ", callstack[i]);
+	std::string trace;
+	for(int i = 0; i < frames; ++i)
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "%p, ", callstack[i]);
+		trace += buf;
+	}
 
-	if(n > 2)
-		trace[n - 2] = '\0';
+	if(trace.size() > 2)
+		trace.resize(trace.size() - 2);
 
 	// ============
 	// = Run atos =
 	// ============
 
-	std::string cmd = text::format("/usr/bin/xcrun atos -p %d %s | /usr/bin/tail -n +%d | /usr/bin/c++filt", getpid(), trace, linesToSkip + 1);
+	std::string cmd = text::format("/usr/bin/xcrun atos -p %d %s | /usr/bin/tail -n +%d | /usr/bin/c++filt", getpid(), trace.c_str(), linesToSkip + 1);
 	char const* argv[] = { "/bin/sh", "-c", cmd.c_str(), NULL };
 
 	int output[2];
-	pipe(&output[0]);
+	if(pipe(output) == -1)
+		return "error";
 
-	pid_t pid = oak::vfork();
+	int mib[2] = { CTL_USER, USER_CS_PATH };
+	size_t path_len = 0;
+	sysctl(mib, 2, NULL, &path_len, NULL, 0);
+	std::string path_env = "PATH=";
+	if(path_len > 0)
+	{
+		size_t offset = path_env.size();
+		path_env.resize(offset + path_len);
+		sysctl(mib, 2, &path_env[offset], &path_len, NULL, 0);
+		if(path_env.back() == '\0')
+			path_env.pop_back();
+	}
+
+	pid_t pid = fork();
 	if(pid == 0)
 	{
-		close(STDOUT_FILENO); close(STDERR_FILENO);
-		dup(output[1]); dup(output[1]);
+		dup2(output[1], STDOUT_FILENO);
+		dup2(output[1], STDERR_FILENO);
 		close(output[0]); close(output[1]);
 
 		signal(SIGPIPE, SIG_DFL);
 
-		int mib[2] = { CTL_USER, USER_CS_PATH };
-		size_t len = 0;
-		sysctl(mib, 2, NULL, &len, NULL, 0);
-		char buf[len + 5];
-		strcpy(buf, "PATH=");
-		sysctl(mib, 2, buf + 5, &len, NULL, 0);
-
-		char const* envp[] = { "LANG=en_US.UTF-8", "LC_CTYPE=en_US.UTF-8", buf, NULL };
+		char const* envp[] = { "LANG=en_US.UTF-8", "LC_CTYPE=en_US.UTF-8", path_env.c_str(), NULL };
 		execve(argv[0], (char* const*)argv, (char* const*)envp);
 		_exit(EXIT_FAILURE);
 	}
@@ -65,6 +75,7 @@ std::string OakStackDump (int linesToSkip)
 			close(output[0]);
 			return res;
 		}
+		close(output[0]);
 	}
 	return "error";
 }

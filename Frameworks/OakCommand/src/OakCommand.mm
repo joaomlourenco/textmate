@@ -69,14 +69,11 @@ static std::tuple<pid_t, int, int> my_fork (char const* cmd, int inputRead, std:
 
 	oak::c_array env(environment);
 
-	pid_t pid = oak::vfork();
+	pid_t pid = fork();
 	if(pid == 0)
 	{
 		int const signals[] = { SIGINT, SIGTERM, SIGPIPE, SIGUSR1 };
 		for(int sig : signals) signal(sig, SIG_DFL);
-
-		int const oldOutErr[] = { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO };
-		int const newOutErr[] = { inputRead, outputWrite, errorWrite };
 
 		for(int fd = getdtablesize(); --fd > STDERR_FILENO; )
 		{
@@ -91,8 +88,9 @@ static std::tuple<pid_t, int, int> my_fork (char const* cmd, int inputRead, std:
 			}
 		}
 
-		for(int fd : oldOutErr) close(fd);
-		for(int fd : newOutErr) dup(fd);
+		dup2(inputRead, STDIN_FILENO);
+		dup2(outputWrite, STDOUT_FILENO);
+		dup2(errorWrite, STDERR_FILENO);
 
 		setpgid(0, getpid());
 		chdir(workingDir);

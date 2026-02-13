@@ -604,7 +604,7 @@ class CompileClang < Compiler
             in:          header,
             out:         output,
             flags:       [ '-x', info[:type], *flags ].join(' '),
-            command:     'xcrun --sdk macosx clang -c -o $out $flags -MMD -MF $out.d $in',
+            command:     'xcrun --sdk macosx clang -c -o $out -isysroot $(xcrun --sdk macosx --show-sdk-path) $flags -MMD -MF $out.d $in',
             depfile:     '$out.d',
             deps:        'gcc',
             description: 'Precompile ‘${in}’…',
@@ -621,7 +621,7 @@ class CompileClang < Compiler
     super.merge(
       before:       pch,
       flags:        flags.join(' '),
-      command:      'xcrun --sdk macosx clang -c -o $out $flags -MMD -MF $out.d $in',
+      command:      'xcrun --sdk macosx clang -c -o $out -isysroot $(xcrun --sdk macosx --show-sdk-path) $flags -MMD -MF $out.d $in',
       depfile:      '$out.d',
       deps:         'gcc',
       description:  'Compile ‘${in}’…',
@@ -936,7 +936,7 @@ module Target
           in:           objects.sort.uniq,
           out:          executable,
           flags:        ln_flags.join(' '),
-          command:      'xcrun --sdk macosx clang -o $out $flags $in',
+          command:      'xcrun --sdk macosx clang -o $out -isysroot $(xcrun --sdk macosx --show-sdk-path) $flags $in',
           description:  'Link ‘${out}’…',
           dependencies: deps
         }
