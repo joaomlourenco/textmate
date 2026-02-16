@@ -44,14 +44,17 @@ namespace ng
 		if(!utf8::multibyte<char>::partial(ch))
 			return ch;
 
-		while(!utf8::multibyte<char>::is_start(ch))
-		{
-			ASSERT(0 < i);
-			ch = at(--i);
-		}
+		size_t j = i;
+		while(j > 0 && !utf8::multibyte<char>::is_start(ch))
+			ch = at(--j);
 
-		len = utf8::multibyte<char>::length(ch);
-		return utf8::to_ch(_storage.substr(i, i + len));
+		if(utf8::multibyte<char>::is_start(ch))
+		{
+			i = j;
+			len = utf8::multibyte<char>::length(ch);
+			return utf8::to_ch(_storage.substr(i, i + len));
+		}
+		return ch;
 	}
 
 	static bool is_non_base (uint32_t ch)
@@ -64,10 +67,10 @@ namespace ng
 	{
 		if(size() <= i)
 			return size();
-		while(utf8::multibyte<char>::partial(at(i)) && !utf8::multibyte<char>::is_start(at(i)))
+		while(i > 0 && utf8::multibyte<char>::partial(at(i)) && !utf8::multibyte<char>::is_start(at(i)))
 			--i;
 		uint32_t codePoint = utf8::to_ch(_storage.substr(i, i + (utf8::multibyte<char>::is_start(at(i)) ? utf8::multibyte<char>::length(at(i)) : 1)));
-		return is_non_base(codePoint) ? sanitize_index(i-1) : i;
+		return i > 0 && is_non_base(codePoint) ? sanitize_index(i-1) : i;
 	}
 
 	std::string buffer_t::operator[] (size_t i) const
@@ -87,9 +90,8 @@ namespace ng
 			else	break;
 		}
 
-		while(is_non_base(ch))
+		while(from > 0 && is_non_base(ch))
 		{
-			ASSERT(from);
 			size_t len;
 			ch = code_point(--from, len);
 			totalLen += len;
