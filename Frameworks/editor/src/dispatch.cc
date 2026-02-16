@@ -303,7 +303,11 @@ namespace ng
 
 		for(auto const& command : commands)
 		{
-			plist::dictionary_t dict = boost::get<plist::dictionary_t>(command); // TODO ASSERT this!
+			plist::dictionary_t const* dict_ptr = boost::get<plist::dictionary_t>(&command);
+			if(!dict_ptr)
+				continue;
+
+			plist::dictionary_t const& dict = *dict_ptr;
 			std::string sel, str;
 			plist::dictionary_t args;
 			if(plist::get_key_path(dict, "command", sel))
