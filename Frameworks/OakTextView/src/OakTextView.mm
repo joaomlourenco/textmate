@@ -1224,32 +1224,108 @@ doScroll:
 
 - (NSRange)nsRangeForRange:(ng::range_t const&)range
 {
-	//TODO this and the next method could use some optimization using an interval tree
-	//     similar to basic_tree_t for conversion between UTF-8 and UTF-16 indexes.
-	//     Currently poor performance for large documents (O(N)) would then get to O(log(N))
-	//     Also currently copy of whole text is created here, which is not optimal
-
-	size_t to = std::min(range.max().index, documentView->size());
-	if(to == 0)
+	if(!documentView)
 		return NSMakeRange(0, 0);
 
-	std::string const text = documentView->substr(0, to);
-	size_t from = std::min(range.min().index, text.size());
+	size_t const bufferSize = documentView->size();
+	size_t const targetFrom = std::min(range.min().index, bufferSize);
+	size_t const targetTo   = std::min(range.max().index, bufferSize);
 
-	crash_reporter_info_t info("%s %s, actual %zu-%zu", sel_getName(_cmd), to_s(range).c_str(), from, to);
+	if(targetTo == 0)
+		return NSMakeRange(0, 0);
 
-	NSUInteger location = utf16::distance(text.data(), text.data() + from);
-	NSUInteger length   = utf16::distance(text.data() + from, text.data() + text.size());
+	__block NSUInteger location = 0;
+	__block NSUInteger length   = 0;
+
+	documentView->visit_data(^(char const* bytes, size_t offset, size_t len, bool* stop){
+		size_t const segmentStart = offset;
+		size_t const segmentEnd   = offset + len;
+
+		if(segmentStart < targetFrom)
+		{
+			size_t const subTo = std::min(segmentEnd, targetFrom);
+			location += utf16::distance(bytes, bytes + (subTo - segmentStart));
+		}
+
+		if(segmentEnd > targetFrom && segmentStart < targetTo)
+		{
+			size_t const subFrom = std::max(segmentStart, targetFrom);
+			size_t const subTo   = std::min(segmentEnd, targetTo);
+			length += utf16::distance(bytes + (subFrom - segmentStart), bytes + (subTo - segmentStart));
+		}
+
+		if(segmentStart >= targetTo)
+			*stop = true;
+	});
+
 	return NSMakeRange(location, length);
 }
 
 - (ng::range_t)rangeForNSRange:(NSRange)nsRange
 {
-	std::string const text = documentView->substr();
-	char const* base = text.data();
-	ng::index_t from = utf16::advance(base, nsRange.location, base + text.size()) - base;
-	ng::index_t to   = utf16::advance(base + from.index, nsRange.length, base + text.size()) - base;
-	return ng::range_t(from, to);
+	if(!documentView || nsRange.location == NSNotFound)
+		return ng::range_t();
+
+	__block NSUInteger locationRemaining = nsRange.location;
+	__block NSUInteger lengthRemaining   = nsRange.length;
+	__block size_t utf8Location = 0;
+	__block size_t utf8Length   = 0;
+
+	documentView->visit_data(^(char const* bytes, size_t offset, size_t len, bool* stop){
+		if(locationRemaining > 0)
+		{
+			char const* first = bytes;
+			char const* last  = bytes + len;
+			char const* it    = first;
+			while(locationRemaining > 0 && it != last)
+			{
+				uint32_t ch = utf8::to_ch(std::string(it, std::min<size_t>(last - it, 6))); // Safe length for to_ch
+				size_t chLen = utf8::multibyte<char>::length(*it);
+				size_t u16Len = (ch > 0xFFFF) ? 2 : 1;
+				
+				if(u16Len <= locationRemaining)
+				{
+					locationRemaining -= u16Len;
+					it += chLen;
+					utf8Location += chLen;
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
+		
+		if(locationRemaining == 0 && lengthRemaining > 0)
+		{
+			char const* first = bytes;
+			char const* last  = bytes + len;
+			char const* it    = (utf8Location >= offset && utf8Location < offset + len) ? bytes + (utf8Location - offset) : bytes;
+			
+			while(lengthRemaining > 0 && it != last)
+			{
+				uint32_t ch = utf8::to_ch(std::string(it, std::min<size_t>(last - it, 6)));
+				size_t chLen = utf8::multibyte<char>::length(*it);
+				size_t u16Len = (ch > 0xFFFF) ? 2 : 1;
+
+				if(u16Len <= lengthRemaining)
+				{
+					lengthRemaining -= u16Len;
+					it += chLen;
+					utf8Length += chLen;
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
+		
+		if(locationRemaining == 0 && lengthRemaining == 0)
+			*stop = true;
+	});
+
+	return ng::range_t(utf8Location, utf8Location + utf8Length);
 }
 
 - (ng::ranges_t)rangesForReplacementRange:(NSRange)aRange
