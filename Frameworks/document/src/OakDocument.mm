@@ -1227,7 +1227,7 @@ static void* kDocumentEditedObserverContext = &kDocumentEditedObserverContext;
 
 - (void)setContinuousSpellCheckingEnabled:(BOOL)value { if(_buffer) _buffer->set_live_spelling(value); }
 - (void)setSpellingLanguage:(NSString*)value          { if(_buffer) _buffer->set_spelling_language(to_s(value)); }
-- (void)setTabSize:(NSUInteger)value                  { if(_buffer) _buffer->indent().set_tab_size(value); }
+- (void)setTabSize:(NSUInteger)value                  { if(_buffer) _buffer->indent().set_tab_size(std::max<NSUInteger>(1, value)); }
 - (void)setSoftTabs:(BOOL)value                       { if(_buffer) _buffer->indent().set_soft_tabs(value); }
 
 - (ng::buffer_t&)buffer                               { ASSERT(_buffer); return *_buffer; }

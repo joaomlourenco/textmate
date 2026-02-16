@@ -1,14 +1,18 @@
 #ifndef TEXT_INDENT_H_VYHC46E4
 #define TEXT_INDENT_H_VYHC46E4
 
+#include <algorithm>
+
 namespace text
 {
 	struct indent_t
 	{
-		indent_t (size_t tabSize = 8, size_t indentSize = SIZE_T_MAX, bool softTabs = false, bool tabFollowsIndent = true) : _tab_size(tabSize), _indent_size(indentSize), _soft_tabs(softTabs), _tab_follows_indent(tabFollowsIndent)
+		indent_t (size_t tabSize = 8, size_t indentSize = SIZE_T_MAX, bool softTabs = false, bool tabFollowsIndent = true) : _tab_size(std::max<size_t>(1, tabSize)), _indent_size(indentSize), _soft_tabs(softTabs), _tab_follows_indent(tabFollowsIndent)
 		{
 			if(indentSize == SIZE_T_MAX)
 				_indent_size = _tab_size;
+			else
+				_indent_size = std::max<size_t>(1, indentSize);
 		}
 
 		size_t tab_size () const                 { return _tab_size;           }
@@ -16,8 +20,8 @@ namespace text
 		bool soft_tabs () const                  { return _soft_tabs;          }
 		bool tab_follows_indent () const         { return _tab_follows_indent; }
 
-		void set_tab_size (size_t tabSize)       { _tab_size = tabSize;        if(_tab_follows_indent) _indent_size = tabSize; }
-		void set_indent_size (size_t indentSize) { _indent_size = indentSize;  if(_tab_follows_indent) _tab_size = indentSize; }
+		void set_tab_size (size_t tabSize)       { _tab_size = std::max<size_t>(1, tabSize); if(_tab_follows_indent) _indent_size = _tab_size; }
+		void set_indent_size (size_t indentSize) { _indent_size = std::max<size_t>(1, indentSize); if(_tab_follows_indent) _tab_size = _indent_size; }
 		void set_soft_tabs (bool softTabs)       { _soft_tabs = softTabs;      }
 		void set_tab_follows_indent (bool flag)  { _tab_follows_indent = flag; }
 

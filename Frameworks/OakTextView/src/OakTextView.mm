@@ -357,7 +357,7 @@ struct document_view_t : ng::buffer_api_t
 	size_t sanitize_index (size_t i) const { return [_document_editor buffer].sanitize_index(i); }
 	size_t convert (text::pos_t const& p) const { return [_document_editor buffer].convert(p); }
 	text::pos_t convert (size_t i) const { return [_document_editor buffer].convert(i); }
-	void set_tab_size (size_t i) { _document.tabSize = i; }
+	void set_tab_size (size_t i) { _document.tabSize = std::max<size_t>(1, i); }
 	size_t tab_size () const { return _document.tabSize; }
 	void set_soft_tabs (bool flag) { _document.softTabs = flag; }
 	bool soft_tabs () const { return _document.softTabs; }
